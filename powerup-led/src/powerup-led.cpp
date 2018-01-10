@@ -90,8 +90,7 @@ void process(cv::Mat image)
 
 int main(int argc, char** argv) {
 	if(argc != 3) {
-		std::cerr << "Format: this-program task intrinsics.yml" << std::endl
-				<< "Tasks: Peg or Boiler" << std::endl;
+		std::cerr << "Format: "<< argv[0] <<" image.file intrinsics.yml" << std::endl;
 		return 2;
 	}
 	cv::String filename = cv::String(argv[1]);
