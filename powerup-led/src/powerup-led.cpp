@@ -16,27 +16,20 @@
 using namespace std;
 
 
-static cv::Mat intrinsic, distortion;
+// Coordinates in the real world in inches
+static const std::vector<cv::Point3f> realPoints {
+	{ 70,-15,140}, {-70, -3,140}, // switch
+	{ 85,-60,300}, {-59,-60,300}  // Scale
+};
 
-std::string date_now()
-{
-	std::time_t result = std::time(nullptr);
-	std::string str(std::asctime(std::localtime(&result)));
-	// trim trailing endl
-	size_t endpos = str.find_last_not_of(" \t\n");
-	if( str.npos != endpos )
-	{
-	    str = str.substr( 0, endpos+1 );
-	}
-	return str + " ";
-}
+static cv::Mat intrinsic, distortion;
 
 bool readIntrinsics(const char *filename)
 {
 	cv::FileStorage fs( filename, cv::FileStorage::READ );
 	if( !fs.isOpened() )
 	{
-		std::cerr << date_now() << " Error: Couldn't open intrinsic parameters file "
+		std::cerr << " Error: Couldn't open intrinsic parameters file "
 				<< filename << std::endl;
 		return false;
 	}
@@ -44,7 +37,7 @@ bool readIntrinsics(const char *filename)
 	fs["distortion_coefficients"] >> distortion;
 	if( intrinsic.empty() || distortion.empty() )
 	{
-		std::cerr << date_now() << " Error: Couldn't load intrinsic parameters from "
+		std::cerr << " Error: Couldn't load intrinsic parameters from "
 				<< filename << std::endl;
 		return false;
 	}
@@ -52,30 +45,10 @@ bool readIntrinsics(const char *filename)
 	return true;
 }
 
-void process(cv::Mat image)
+cv::Point2f getRobotCoordinates(std::vector<cv::Point2f> imagePoints)
 {
-	// Coordinates in the real world in inches
-	static const std::vector<cv::Point3f> realPoints {
-		{-52, -8,140}, {-68, -8,140}, // switch
-		{ 85,-60,300}, {-59,-60,300}  // Scale
-	};
-	// Coordinates in the picture in pixels
-	cv::Point vt_center = cv::Point(794/1.3125,880/1.3125-40);	// vision target center
-	cv::Point sw_leftou = cv::Point(591/1.3125,969/1.3125-40);	// switch left plate outer corner
-	cv::Point sc_righto = cv::Point(804/1.3125,177/1.3125-40);	// scale right plate outer corner
-	cv::Point sc_leftin = cv::Point( 66/1.3125,212/1.3125-40);	// scale left plate inner corner
-	// Draw circles to see if we get the points of interest right
-	cv::circle(image, vt_center, 20, cv::Scalar(0,255,0));
-	cv::circle(image, sw_leftou, 20, cv::Scalar(0,255,0));
-	cv::circle(image, sc_leftin, 20, cv::Scalar(0,255,0));
-	cv::circle(image, sc_righto, 20, cv::Scalar(0,255,0));
-	// Pack the image points in a vector as well making sure they're floating points too
-	std::vector<cv::Point2f> imagePoints;
-	imagePoints.push_back(vt_center);
-	imagePoints.push_back(sw_leftou);
-	imagePoints.push_back(sc_righto);
-	imagePoints.push_back(sc_leftin);
-	cv::Vec3d rvec, tvec, robot_loc, target_loc;
+	cv::Vec3d rvec, tvec, robot_loc;
+	cv::Matx33d rmat, cmat;
 	cv::solvePnP(
 			realPoints,       // 3-d points in object coordinate
 			imagePoints,        // 2-d points in image coordinates
@@ -86,6 +59,34 @@ void process(cv::Mat image)
 	);
 	cout << "Translation vector: " << tvec << std::endl;
 	cout << "Rotation vector: " << rvec << std::endl;
+	cv::Rodrigues(rvec, rmat);
+	robot_loc = rmat.t() * -tvec;
+	cout << "Camera location: " << robot_loc << std::endl;
+	return cv::Point2d(robot_loc(0), robot_loc(2));
+}
+
+void process(cv::Mat image)
+{
+	// Coordinates in the picture in pixels
+	// Let's pretend we detected and identified the features by color filtering and whatsnot
+	cv::Point sw_leftou = cv::Point( 451, 698);	// switch left plate outer corner
+	cv::Point sw_righto = cv::Point(1135, 394);	// switch right plate outer corner
+	cv::Point sc_righto = cv::Point( 612,  95);	// scale right plate outer corner
+	cv::Point sc_leftin = cv::Point(  34, 122);	// scale left plate inner corner
+
+	// Pack the image points in a vector as well making sure they're floating points too
+	std::vector<cv::Point2f> imagePoints;
+	imagePoints.push_back(sw_righto);
+	imagePoints.push_back(sw_leftou);
+	imagePoints.push_back(sc_righto);
+	imagePoints.push_back(sc_leftin);
+
+	// Draw circles to see if we get the points of interest right
+	for(auto it: imagePoints) cv::circle(image, it, 12, cv::Scalar(0,255,155));
+
+	cv::Point2f myLocation = getRobotCoordinates(imagePoints);
+
+	cout << "Robot location: " << myLocation << std::endl;
 }
 
 int main(int argc, char** argv) {
