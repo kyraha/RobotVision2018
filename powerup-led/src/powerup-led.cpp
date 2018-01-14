@@ -35,13 +35,19 @@ bool readIntrinsics(const char *filename)
 	}
 	fs["camera_matrix"] >> intrinsic;
 	fs["distortion_coefficients"] >> distortion;
-	if( intrinsic.empty() || distortion.empty() )
+	fs.release();
+	if( intrinsic.empty() )
 	{
 		std::cerr << " Error: Couldn't load intrinsic parameters from "
 				<< filename << std::endl;
 		return false;
 	}
-	fs.release();
+	if( distortion.empty() )
+	{
+		std::cerr << " Error: Couldn't load distortion parameters from "
+				<< filename << std::endl;
+		return false;
+	}
 	return true;
 }
 
