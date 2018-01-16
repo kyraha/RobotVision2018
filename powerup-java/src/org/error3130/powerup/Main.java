@@ -17,26 +17,30 @@ public class Main {
 		System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
 		System.out.println("Library loaded: "+ Core.NATIVE_LIBRARY_NAME);
 
+		double imageSize;
+
 		if(args.length > 0 ) {
 			Mat image = Imgcodecs.imread(args[0]);
 			if(image.empty()) {
 				System.err.println("Could not import file "+ args[0]);
+				System.err.println("Working dir: "+ System.getProperty("user.dir"));
 				return;
 			}
+			imageSize = Math.sqrt(image.size().area());
 
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
 
 			DetectLED detector = new DetectLED(
-					80,
-					Math.sqrt(image.size().area())/400,
-					Math.sqrt(image.size().area())/16
+					160,
+					imageSize/400,
+					imageSize/16
 				);
 
 			List<Point> lights = detector.findLEDs(image);
 			System.out.println("Lights detected: "+ lights.size());
 			for(Point center: lights) {
-				Imgproc.circle(image, center , 10, Scalar.all(255));
+				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
 			}
 
 			HighGui.imshow("test", image);
@@ -48,6 +52,6 @@ public class Main {
 			return;
 		}
 		System.out.println("All done");
-		return;
+		System.exit(0);
 	}
 }
