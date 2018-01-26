@@ -1,7 +1,5 @@
 package org.error3130.powerup;
 
-import java.util.List;
-
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
@@ -31,20 +29,32 @@ public class Main {
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
 
-			DetectLED detector = new DetectLED(
-					160,
-					imageSize/400,
-					imageSize/16
-				);
+			DetectLED detector = new DetectLED()
+					.withThresh(160)
+					.withMinArea(imageSize/400)
+					.withMaxArea(imageSize/16)
+					.withMaxSegment(imageSize/10)
+					.findLEDs(image)
+					.findSegments()
+					.findLines();
 
-			List<Point> lights = detector.findLEDs(image);
-			System.out.println("Lights detected: "+ lights.size());
-			for(Point center: lights) {
+			System.out.println("Lights detected: "+ detector.lights.size());
+			for(Point center: detector.lights) {
 				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
 			}
+			HighGui.imshow("test", image);
+			HighGui.waitKey();
+
+			System.out.println("Segments detected: "+ detector.segments.size());
+			for(DetectLED.asdf segP: detector.segmentPairs) {
+				Imgproc.line(image, segP.a.A, segP.b.B, new Scalar(0, 255, 255));
+			}
+
+			System.out.println("Segment pairs detected: "+ detector.segmentPairs.size());
 
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
+
 			HighGui.destroyAllWindows();
 		}
 		else {
