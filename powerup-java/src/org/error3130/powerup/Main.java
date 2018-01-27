@@ -8,6 +8,8 @@ import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.error3130.powerup.DetectLED;
+import org.error3130.powerup.DetectLED.Segment;
+import org.error3130.powerup.DetectLED.SegmentPair;
 
 public class Main {
 	public static void main( String[] args )
@@ -46,11 +48,24 @@ public class Main {
 			HighGui.waitKey();
 
 			System.out.println("Segments detected: "+ detector.segments.size());
-			for(DetectLED.asdf segP: detector.segmentPairs) {
-				Imgproc.line(image, segP.a.A, segP.b.B, new Scalar(0, 255, 255));
-			}
-
 			System.out.println("Segment pairs detected: "+ detector.segmentPairs.size());
+//			for(Segment seg: detector.segments) {
+//				Imgproc.line(image, detector.lights.get(seg.A), detector.lights.get(seg.B), new Scalar(0, 255, 255));
+//			}
+
+			int color = 0;
+			for(SegmentPair sp: detector.segmentPairs) {
+				Imgproc.line(image,
+						detector.lights.get(sp.a.A),
+						detector.lights.get(sp.a.B),
+						new Scalar(255, color, 200));
+				Imgproc.line(image,
+						detector.lights.get(sp.b.A),
+						detector.lights.get(sp.b.B),
+						new Scalar(255, color, 200));
+				color+=29;
+				if(color > 255) color -= 256;
+			}
 
 			HighGui.imshow("test", image);
 			HighGui.waitKey();

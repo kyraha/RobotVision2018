@@ -15,33 +15,36 @@ public class DetectLED
 		double slope;
 		double intercept;
 		public Line(double m, double b) {slope=m; intercept=b;}
+		public String toString() {
+			return "(" + slope + ", " + intercept + ")";
+		}
 	}
 
 	class Segment {
-		Point A, B;
-		public Segment(Point a, Point b) {A=a; B=b;}
+		int A, B;
+		public Segment(int a, int b) {A=a; B=b;}
 		public double length() {
-			double dx = B.x - A.x;
-			double dy = B.y - A.y;
+			double dx = lights.get(B).x - lights.get(A).x;
+			double dy = lights.get(B).y - lights.get(A).y;
 			return Math.sqrt(dx*dx + dy*dy); 
 		}
 		public Line line() {
-			if(A.x != B.x) {
-				double slope = (B.y-A.y)/(B.x-A.x);
-				double intercept = A.y + slope*A.x;
+			if(lights.get(A).x != lights.get(B).x) {
+				double slope = (lights.get(B).y-lights.get(A).y)/(lights.get(B).x-lights.get(A).x);
+				double intercept = lights.get(A).y + slope*lights.get(A).x;
 				return new Line( slope, intercept);
 			}
 			else {
 				// In case if the is vertical the Y-intercept doesn't make sense
 				// So if we store the X-intercept it will be enough to describe the line
-				return new Line( Double.POSITIVE_INFINITY, A.x );
+				return new Line( Double.POSITIVE_INFINITY, lights.get(A).x );
 			}
 		}
 	}
 
-	class asdf {
+	class SegmentPair {
 		public Segment a, b;
-		public asdf(Segment s1, Segment s2) {a=s1; b=s2;}
+		public SegmentPair(Segment s1, Segment s2) {a=s1; b=s2;}
 	}
 
 	private double thresh;
@@ -50,7 +53,7 @@ public class DetectLED
 	private double maxSeg;
 	public List<Point> lights = new ArrayList<Point>();
 	public List<Segment> segments = new ArrayList<Segment>();
-	public List<asdf> segmentPairs = new ArrayList<asdf>();
+	public List<SegmentPair> segmentPairs = new ArrayList<SegmentPair>();
 
 	public DetectLED(double brightnessThresh, double blobMinArea, double blobMaxArea) {
 		this.maxArea = blobMaxArea;
@@ -93,8 +96,8 @@ public class DetectLED
 	
 	public DetectLED findSegments() {
 		for (int i=0; i < lights.size(); i++) {
-			for (int j=i; j < lights.size(); j++) {
-				Segment seg = new Segment(lights.get(i),lights.get(j));
+			for (int j=i+1; j < lights.size(); j++) {
+				Segment seg = new Segment(i, j);
 				if(seg.length() < maxSeg) segments.add(seg);
 			}
 		}
@@ -104,13 +107,16 @@ public class DetectLED
 	public DetectLED findLines() {
 		for (int i=0; i < segments.size(); i++) {
 			Line li = segments.get(i).line();
-			for (int j=i; j < segments.size(); j++) {
+			for (int j=i+1; j < segments.size(); j++) {
 				Line lj = segments.get(j).line();
 				if(
 						Math.abs(li.slope-lj.slope) < 0.1
-					&&  Math.abs(li.intercept-lj.intercept) < 0.1
-						)
-					segmentPairs.add(new asdf(segments.get(i), segments.get(j)));
+					&&  Math.abs(li.intercept-lj.intercept) < 1.0
+						) {
+					segmentPairs.add(new SegmentPair(segments.get(i), segments.get(j)));
+					System.out.println("Line: "+li+" and "+lj);
+					
+				}
 			}
 		}
 		return this;
