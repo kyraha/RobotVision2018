@@ -9,7 +9,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.error3130.powerup.DetectLED;
 import org.error3130.powerup.DetectLED.Segment;
-import org.error3130.powerup.DetectLED.SegmentPair;
+import org.error3130.powerup.DetectLED.Chain;
 
 public class Main {
 	public static void main( String[] args )
@@ -38,7 +38,7 @@ public class Main {
 					.withMaxSegment(imageSize/10)
 					.findLEDs(image)
 					.findSegments()
-					.findLines();
+					.findChains();
 
 			System.out.println("Lights detected: "+ detector.lights.size());
 			for(Point center: detector.lights) {
@@ -47,28 +47,22 @@ public class Main {
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
 
-			System.out.println("Segments detected: "+ detector.segments.size());
-			System.out.println("Segment pairs detected: "+ detector.segmentPairs.size());
-//			for(Segment seg: detector.segments) {
-//				Imgproc.line(image, detector.lights.get(seg.A), detector.lights.get(seg.B), new Scalar(0, 255, 255));
-//			}
+			System.out.println("Chains detected: "+ detector.chains.size());
 
 			int color = 0;
-			for(SegmentPair sp: detector.segmentPairs) {
-				Imgproc.line(image,
-						detector.lights.get(sp.a.A),
-						detector.lights.get(sp.a.B),
-						new Scalar(255, color, 200));
-				Imgproc.line(image,
-						detector.lights.get(sp.b.A),
-						detector.lights.get(sp.b.B),
-						new Scalar(255, color, 200));
-				color+=29;
-				if(color > 255) color -= 256;
+			for(Chain sp: detector.chains) {
+				if(sp.steps.size() > 6) {
+					for(Segment seg: sp.steps) {
+						Imgproc.line(image, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
+					}
+					System.out.println(sp.steps);
+					HighGui.imshow("test", image);
+					int key = HighGui.waitKey(0);
+					color+=29;
+					if(color > 200) color -= 200;
+					if(key == 27) break;
+				}
 			}
-
-			HighGui.imshow("test", image);
-			HighGui.waitKey();
 
 			HighGui.destroyAllWindows();
 		}

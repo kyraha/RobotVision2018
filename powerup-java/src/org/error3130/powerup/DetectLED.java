@@ -1,6 +1,8 @@
 package org.error3130.powerup;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import org.opencv.core.Mat;
@@ -22,11 +24,18 @@ public class DetectLED
 
 	class Segment {
 		int A, B;
-		public Segment(int a, int b) {A=a; B=b;}
+		public Segment(int a, int b) { A=a; B=b; }
+		public String toString() {
+			return "[" + A + ", " + B + "]";
+		}
+
+		public Point pointA() { return lights.get(A); }
+		public Point pointB() { return lights.get(B); }
+		public Point vector() {
+			return new Point(pointB().x-pointA().x, pointB().y - pointA().y);
+		}
 		public double length() {
-			double dx = lights.get(B).x - lights.get(A).x;
-			double dy = lights.get(B).y - lights.get(A).y;
-			return Math.sqrt(dx*dx + dy*dy); 
+			return Math.sqrt(vector().dot(vector()));
 		}
 		public Line line() {
 			if(lights.get(A).x != lights.get(B).x) {
@@ -40,11 +49,53 @@ public class DetectLED
 				return new Line( Double.POSITIVE_INFINITY, lights.get(A).x );
 			}
 		}
+		public double crossMag(Segment other) {
+			double x1 = this.vector().x;
+			double y1 = this.vector().y;
+			double x2 = other.vector().x;
+			double y2 = other.vector().y;
+			return x1*y2 - y1*x2; // Magnitude of the cross product
+		}
 	}
 
-	class SegmentPair {
-		public Segment a, b;
-		public SegmentPair(Segment s1, Segment s2) {a=s1; b=s2;}
+	class Chain {
+		public List<Segment> steps = new ArrayList<Segment>();
+		public double totalScore = 0;
+
+		public Chain(Segment s1) {steps.add(s1);}
+
+		public boolean bestMatch(double limit) {
+			double bestScore = Double.MAX_VALUE;
+			int bestLight = -1;
+			int myEnd = steps.get(steps.size()-1).B;
+			List<Integer> myPoints = new ArrayList<>();
+			for(Segment s: steps) { myPoints.add(s.A); }
+			myPoints.add(myEnd);
+			for(int p = 0; p < lights.size(); p++) {
+				if(myPoints.contains(p)) continue;
+				Segment s = new Segment(myEnd,p);
+				double score = 0;
+				for(Segment step: steps) {
+					double mlen = step.length();
+					double slen = s.length();
+					score += Math.abs(mlen-slen)/mlen;
+					// A property of the cross product: |a X b| = |a||b||sin|
+					score += Math.abs(step.crossMag(s)/(mlen*slen));
+					// A property of the dot product: a * b = |a||b||cos|
+					score += Math.abs(step.vector().dot(s.vector())/(mlen*slen) - 1.0);
+				}
+				if(score < bestScore) {
+					bestScore = score;
+					bestLight = p;
+				}
+			}
+			if(bestLight >= 0 && (steps.size()==1 || bestScore < limit*totalScore/steps.size())) {
+				steps.add(new Segment(myEnd, bestLight));
+				totalScore += bestScore;
+				return true;
+			}
+			return false;
+		}
 	}
 
 	private double thresh;
@@ -52,8 +103,7 @@ public class DetectLED
 	private double maxArea;
 	private double maxSeg;
 	public List<Point> lights = new ArrayList<Point>();
-	public List<Segment> segments = new ArrayList<Segment>();
-	public List<SegmentPair> segmentPairs = new ArrayList<SegmentPair>();
+	public List<Chain> chains = new ArrayList<Chain>();
 
 	public DetectLED(double brightnessThresh, double blobMinArea, double blobMaxArea) {
 		this.maxArea = blobMaxArea;
@@ -95,30 +145,46 @@ public class DetectLED
 	}
 	
 	public DetectLED findSegments() {
+		// Every single line segment is a candidate to build a chain upon it
+		// So let's seed the starting points for all potential chains
 		for (int i=0; i < lights.size(); i++) {
-			for (int j=i+1; j < lights.size(); j++) {
-				Segment seg = new Segment(i, j);
-				if(seg.length() < maxSeg) segments.add(seg);
-			}
-		}
-		return this;
-	}
-
-	public DetectLED findLines() {
-		for (int i=0; i < segments.size(); i++) {
-			Line li = segments.get(i).line();
-			for (int j=i+1; j < segments.size(); j++) {
-				Line lj = segments.get(j).line();
-				if(
-						Math.abs(li.slope-lj.slope) < 0.1
-					&&  Math.abs(li.intercept-lj.intercept) < 1.0
-						) {
-					segmentPairs.add(new SegmentPair(segments.get(i), segments.get(j)));
-					System.out.println("Line: "+li+" and "+lj);
-					
+			for (int j=0; j < lights.size(); j++) {
+				if(i != j && new Segment(i, j).length() < maxSeg) {
+					chains.add(new Chain(new Segment(i, j)));
 				}
 			}
 		}
 		return this;
 	}
+
+	public DetectLED findChains() {
+		double bestSoFar = Double.MAX_VALUE;
+		System.out.println("Starting with: "+bestSoFar);
+		for (Chain c: chains) {
+			boolean found;
+			double avgScore = 0;
+			// Build the chain with up to 8 steps (9 total, or 10 points)
+			for (int i = 0; i < 8; i++) {
+				found = c.bestMatch(15.0);
+				avgScore = c.totalScore/c.steps.size();
+				if(!found) break;
+			}
+			c.totalScore += Math.abs(9 - c.steps.size())/9;
+			avgScore = c.totalScore/c.steps.size();
+			if(avgScore < bestSoFar) {
+				bestSoFar = avgScore;
+				System.out.println("chain size: " + c.steps.size() + ", score: " + avgScore);
+			}
+		}
+		Collections.sort(chains, new Comparator<Chain>() {
+			public int compare(Chain a, Chain b) {
+				if (a.totalScore < b.totalScore) return -1;
+				if (a.totalScore > b.totalScore) return 1;
+				return 0;
+			}
+		});
+		
+		return this;
+	}
+
 }
