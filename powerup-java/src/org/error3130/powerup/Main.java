@@ -41,8 +41,10 @@ public class Main {
 					.findChains();
 
 			System.out.println("Lights detected: "+ detector.lights.size());
-			for(Point center: detector.lights) {
+			for(int i = 0; i < detector.lights.size(); i++) {
+				Point center = detector.lights.get(i);
 				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
+				Imgproc.putText(image, " "+i, center, 1, 1, new Scalar(0,0,255));
 			}
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
@@ -55,7 +57,7 @@ public class Main {
 					for(Segment seg: sp.steps) {
 						Imgproc.line(image, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
 					}
-					System.out.println(sp.steps);
+					System.out.println(sp.steps +" "+ sp.totalScore);
 					HighGui.imshow("test", image);
 					int key = HighGui.waitKey(0);
 					color+=29;

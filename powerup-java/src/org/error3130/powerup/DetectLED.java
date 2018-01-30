@@ -13,20 +13,17 @@ import org.opencv.imgproc.Moments;
 
 public class DetectLED
 {
-	class Line {
-		double slope;
-		double intercept;
-		public Line(double m, double b) {slope=m; intercept=b;}
-		public String toString() {
-			return "(" + slope + ", " + intercept + ")";
-		}
+	public static double segLength(Point o, Point p) {
+		double dx = o.x - p.x;
+		double dy = o.y - p.y;
+		return Math.sqrt(dx*dx + dy*dy);
 	}
 
-	class Segment {
+	public class Segment {
 		int A, B;
 		public Segment(int a, int b) { A=a; B=b; }
 		public String toString() {
-			return "[" + A + ", " + B + "]";
+			return "[" + A + "," + B + "]";
 		}
 
 		public Point pointA() { return lights.get(A); }
@@ -37,32 +34,44 @@ public class DetectLED
 		public double length() {
 			return Math.sqrt(vector().dot(vector()));
 		}
-		public Line line() {
-			if(lights.get(A).x != lights.get(B).x) {
-				double slope = (lights.get(B).y-lights.get(A).y)/(lights.get(B).x-lights.get(A).x);
-				double intercept = lights.get(A).y + slope*lights.get(A).x;
-				return new Line( slope, intercept);
-			}
-			else {
-				// In case if the is vertical the Y-intercept doesn't make sense
-				// So if we store the X-intercept it will be enough to describe the line
-				return new Line( Double.POSITIVE_INFINITY, lights.get(A).x );
-			}
-		}
-		public double crossMag(Segment other) {
+		public double crossMag(Point otherVec) {
 			double x1 = this.vector().x;
 			double y1 = this.vector().y;
-			double x2 = other.vector().x;
-			double y2 = other.vector().y;
+			double x2 = otherVec.x;
+			double y2 = otherVec.y;
 			return x1*y2 - y1*x2; // Magnitude of the cross product
+		}
+		public double crossMag(Segment other) {
+			Point vec = other.vector();
+			return crossMag(vec);
 		}
 	}
 
-	class Chain {
+	public class Chain {
 		public List<Segment> steps = new ArrayList<Segment>();
 		public double totalScore = 0;
 
 		public Chain(Segment s1) {steps.add(s1);}
+
+		double score(Point p) {
+			Point o = lights.get(steps.get(steps.size()-1).B);
+			Point v = new Point(p.x-o.x, p.y-o.y); // This is a vector from the end to the point p
+			double score = 0;
+			for(Segment step: steps) {
+				double mlen = step.length();
+				double slen = segLength(o,p);
+				// Check if the distance is close to N times the step
+				double offset = mlen > slen ? mlen % slen / slen : slen % mlen / mlen;
+				score += Math.abs(offset < 0.5 ? offset : 1.0 - offset) * 5;
+				// Add score if the point is too far
+				score += Math.abs(slen - mlen) / 10;
+				// A property of the cross product: |a X b| = |a||b||sin|
+				score += Math.abs(step.crossMag(v)/(mlen*slen)) * 10;
+				// A property of the dot product: a * b = |a||b||cos|
+				score += Math.abs(step.vector().dot(v)/(mlen*slen) - 1.0) * 50;
+			}
+			return score;
+		}
 
 		public boolean bestMatch(double limit) {
 			double bestScore = Double.MAX_VALUE;
@@ -74,16 +83,7 @@ public class DetectLED
 			for(int p = 0; p < lights.size(); p++) {
 				if(myPoints.contains(p)) continue;
 				Segment s = new Segment(myEnd,p);
-				double score = 0;
-				for(Segment step: steps) {
-					double mlen = step.length();
-					double slen = s.length();
-					score += Math.abs(mlen-slen)/mlen;
-					// A property of the cross product: |a X b| = |a||b||sin|
-					score += Math.abs(step.crossMag(s)/(mlen*slen));
-					// A property of the dot product: a * b = |a||b||cos|
-					score += Math.abs(step.vector().dot(s.vector())/(mlen*slen) - 1.0);
-				}
+				double score = score(lights.get(p));
 				if(score < bestScore) {
 					bestScore = score;
 					bestLight = p;
