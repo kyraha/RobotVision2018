@@ -24,7 +24,7 @@ public class HeatMap {
 		detector.lights.add(new Point(100,200));
 		detector.lights.add(new Point(150,200));
 		detector.lights.add(new Point(200,200));
-		detector.lights.add(new Point(250,200));
+		detector.lights.add(new Point(250,205));
 		detector.lights.add(new Point(300,200));
 		detector.chains.add(detector.new Chain(detector.new Segment(0, 1)));
 		detector.chains.get(0).steps.add(detector.new Segment(0, 1));
@@ -35,13 +35,13 @@ public class HeatMap {
 			for(int y = 0; y < 480; y++) {
 				Point p = new Point(x,y);
 				double score = detector.chains.get(0).score(p);
-				Imgproc.circle(image, p, 0, new Scalar(score,0,0));
+				Imgproc.circle(image, p, 0, new Scalar(score,0,255-score));
 			}
 		}
 		for(int i = 0; i < detector.lights.size(); i++) {
 			Point center = detector.lights.get(i);
-			Imgproc.circle(image, center , 8, new Scalar(255,0,255));
-			Imgproc.putText(image, " "+i, center, 1, 1, new Scalar(0,0,255));
+			Imgproc.circle(image, center , 7, new Scalar(0, 255, 0));
+			Imgproc.putText(image, " "+i, center, 1, 1, new Scalar(0,255,0));
 		}
 		HighGui.imshow("test", image);
 		HighGui.waitKey();

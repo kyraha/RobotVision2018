@@ -53,12 +53,13 @@ public class Main {
 
 			int color = 0;
 			for(Chain sp: detector.chains) {
-				if(sp.steps.size() > 6) {
+				Mat temp = image.clone();
+				if(sp.steps.size() > 5) {
 					for(Segment seg: sp.steps) {
-						Imgproc.line(image, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
+						Imgproc.line(temp, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
 					}
 					System.out.println(sp.steps +" "+ sp.totalScore);
-					HighGui.imshow("test", image);
+					HighGui.imshow("test", temp);
 					int key = HighGui.waitKey(0);
 					color+=29;
 					if(color > 200) color -= 200;

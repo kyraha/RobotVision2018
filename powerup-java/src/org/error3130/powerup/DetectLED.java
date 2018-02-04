@@ -53,22 +53,46 @@ public class DetectLED
 
 		public Chain(Segment s1) {steps.add(s1);}
 
+		double score() {
+			double score = 0;
+			return score;
+		}
+		double scoreGravitational(Point p) {
+			Point o = lights.get(steps.get(steps.size()-1).B);
+			Point gravector = new Point(0,0);
+			for(Segment step: steps) {
+				Point svec = step.vector();
+				for(double M = 0.5; M <= 2; M += 0.5) {
+					Point gpoint = new Point(o.x + M*svec.x, o.y + M*svec.y);
+					Point gvec = new Point(gpoint.x - p.x, gpoint.y - p.y);
+					double r = segLength(gpoint, p);
+					if(r > 0) {
+						gravector.x += gvec.x / Math.abs(M*r*r*r);
+						gravector.y += gvec.y / Math.abs(M*r*r*r);
+					}
+				}
+			}
+			return 0.01 / (gravector.x * gravector.x + gravector.y * gravector.y);
+		}
+
 		double score(Point p) {
 			Point o = lights.get(steps.get(steps.size()-1).B);
 			Point v = new Point(p.x-o.x, p.y-o.y); // This is a vector from the end to the point p
+			double baseLen = steps.get(0).length();
+			double newLen = segLength(o,p);
 			double score = 0;
+			// A property of the cross product: |a X b| = |a||b||sin|
+			score += Math.abs(steps.get(0).crossMag(v)/(baseLen*newLen)) * 512;
+			// A property of the dot product: a * b = |a||b||cos|
+			score += Math.abs(steps.get(0).vector().dot(v)/(baseLen*newLen) - 1.0) * 255;
 			for(Segment step: steps) {
 				double mlen = step.length();
 				double slen = segLength(o,p);
 				// Check if the distance is close to N times the step
-				double offset = mlen > slen ? mlen % slen / slen : slen % mlen / mlen;
-				score += Math.abs(offset < 0.5 ? offset : 1.0 - offset) * 5;
+				double offset = (slen % (0.5*mlen)) / (0.5*mlen);
+				score += Math.abs(offset < 0.5 ? offset : 1.0 - offset);
 				// Add score if the point is too far
-				score += Math.abs(slen - mlen) / 10;
-				// A property of the cross product: |a X b| = |a||b||sin|
-				score += Math.abs(step.crossMag(v)/(mlen*slen)) * 10;
-				// A property of the dot product: a * b = |a||b||cos|
-				score += Math.abs(step.vector().dot(v)/(mlen*slen) - 1.0) * 50;
+				score += Math.abs(slen - mlen) / mlen;
 			}
 			return score;
 		}
@@ -165,11 +189,11 @@ public class DetectLED
 			double avgScore = 0;
 			// Build the chain with up to 8 steps (9 total, or 10 points)
 			for (int i = 0; i < 8; i++) {
-				found = c.bestMatch(15.0);
+				found = c.bestMatch(5.0);
 				avgScore = c.totalScore/c.steps.size();
 				if(!found) break;
 			}
-			c.totalScore += Math.abs(9 - c.steps.size())/9;
+			c.totalScore += Math.abs(9 - c.steps.size());
 			avgScore = c.totalScore/c.steps.size();
 			if(avgScore < bestSoFar) {
 				bestSoFar = avgScore;
@@ -178,8 +202,8 @@ public class DetectLED
 		}
 		Collections.sort(chains, new Comparator<Chain>() {
 			public int compare(Chain a, Chain b) {
-				if (a.totalScore < b.totalScore) return -1;
-				if (a.totalScore > b.totalScore) return 1;
+				if (a.totalScore/a.steps.size() < b.totalScore/b.steps.size()) return -1;
+				if (a.totalScore/a.steps.size() > b.totalScore/b.steps.size()) return 1;
 				return 0;
 			}
 		});
