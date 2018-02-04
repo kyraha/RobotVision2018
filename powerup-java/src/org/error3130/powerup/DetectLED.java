@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
@@ -55,8 +56,19 @@ public class DetectLED
 
 		double score() {
 			double score = 0;
+			Mat points = new Mat(steps.size()+1,2,CvType.CV_32FC1);
+			Mat line = new Mat(4,1,CvType.CV_32FC1);
+			points.put(0, 0, lights.get(steps.get(0).A).x);
+			points.put(0, 1, lights.get(steps.get(0).A).y);
+			for(int i = 0; i < steps.size(); i++) {
+				points.put(i+1, 0, lights.get(steps.get(i).B).x);
+				points.put(i+1, 1, lights.get(steps.get(i).B).y);
+			}
+			Imgproc.fitLine(points, line, Imgproc.CV_DIST_L2, 0, 0.01, 0.01);
+			System.out.println("FitLine:"+ line.get(0, 0)[0] +","+ line.get(1, 0)[0] +" - "+ line.get(2, 0)[0] +","+ line.get(3, 0)[0]); 
 			return score;
 		}
+
 		double scoreGravitational(Point p) {
 			Point o = lights.get(steps.get(steps.size()-1).B);
 			Point gravector = new Point(0,0);
@@ -73,6 +85,19 @@ public class DetectLED
 				}
 			}
 			return 0.01 / (gravector.x * gravector.x + gravector.y * gravector.y);
+		}
+
+		double scoreByDistance(Point p) {
+			double score = 0;
+			Point o = lights.get(steps.get(steps.size()-1).B);
+			Point v = new Point(p.x-o.x, p.y-o.y); // This is a vector from the end to the point p
+			Point s = steps.get(0).vector();
+			score += steps.get(0).length() / segLength(v, s);
+			s.x /= 2.0; s.y /= 2.0;
+			score += steps.get(0).length() / segLength(v, s);
+			s.x *= 4.0; s.y *= 4.0;
+			score += steps.get(0).length() / segLength(v, s);
+			return 255.0 / score;
 		}
 
 		double score(Point p) {
@@ -107,13 +132,13 @@ public class DetectLED
 			for(int p = 0; p < lights.size(); p++) {
 				if(myPoints.contains(p)) continue;
 				Segment s = new Segment(myEnd,p);
-				double score = score(lights.get(p));
+				double score = scoreByDistance(lights.get(p));
 				if(score < bestScore) {
 					bestScore = score;
 					bestLight = p;
 				}
 			}
-			if(bestLight >= 0 && (steps.size()==1 || bestScore < limit*totalScore/steps.size())) {
+			if(bestLight >= 0 && (steps.size()==1 || bestScore < limit)) {
 				steps.add(new Segment(myEnd, bestLight));
 				totalScore += bestScore;
 				return true;
@@ -189,21 +214,21 @@ public class DetectLED
 			double avgScore = 0;
 			// Build the chain with up to 8 steps (9 total, or 10 points)
 			for (int i = 0; i < 8; i++) {
-				found = c.bestMatch(5.0);
+				found = c.bestMatch(30.0);
 				avgScore = c.totalScore/c.steps.size();
 				if(!found) break;
 			}
-			c.totalScore += Math.abs(9 - c.steps.size());
+			c.totalScore += Math.abs(9 - c.steps.size()) * 60;
 			avgScore = c.totalScore/c.steps.size();
 			if(avgScore < bestSoFar) {
 				bestSoFar = avgScore;
-				System.out.println("chain size: " + c.steps.size() + ", score: " + avgScore);
+				System.out.println("chain size: " + c.steps.size() + ", score: " + c.score());
 			}
 		}
 		Collections.sort(chains, new Comparator<Chain>() {
 			public int compare(Chain a, Chain b) {
-				if (a.totalScore/a.steps.size() < b.totalScore/b.steps.size()) return -1;
-				if (a.totalScore/a.steps.size() > b.totalScore/b.steps.size()) return 1;
+				if (a.score() < b.score()) return -1;
+				if (a.score() > b.score()) return 1;
 				return 0;
 			}
 		});

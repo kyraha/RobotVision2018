@@ -34,7 +34,7 @@ public class HeatMap {
 		for(int x = 0; x < 640; x++) {
 			for(int y = 0; y < 480; y++) {
 				Point p = new Point(x,y);
-				double score = detector.chains.get(0).score(p);
+				double score = detector.chains.get(0).scoreByDistance(p);
 				Imgproc.circle(image, p, 0, new Scalar(score,0,255-score));
 			}
 		}

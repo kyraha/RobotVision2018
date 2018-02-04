@@ -32,7 +32,7 @@ public class Main {
 			HighGui.waitKey();
 
 			DetectLED detector = new DetectLED()
-					.withThresh(160)
+					.withThresh(120)
 					.withMinArea(imageSize/400)
 					.withMaxArea(imageSize/16)
 					.withMaxSegment(imageSize/10)
@@ -54,7 +54,7 @@ public class Main {
 			int color = 0;
 			for(Chain sp: detector.chains) {
 				Mat temp = image.clone();
-				if(sp.steps.size() > 5) {
+				if(sp.steps.size() > 1) {
 					for(Segment seg: sp.steps) {
 						Imgproc.line(temp, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
 					}
