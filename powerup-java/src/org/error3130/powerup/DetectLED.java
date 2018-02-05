@@ -27,20 +27,16 @@ public class DetectLED
 			return "[" + A + "," + B + "]";
 		}
 
-		public Point pointA() { return lights.get(A); }
-		public Point pointB() { return lights.get(B); }
-		public Point vector() {
-			return new Point(pointB().x-pointA().x, pointB().y - pointA().y);
+		public Point2 pointA() { return lights.get(A); }
+		public Point2 pointB() { return lights.get(B); }
+		public Point2 vector() {
+			return pointB().minus(pointA());
 		}
 		public double length() {
 			return Math.sqrt(vector().dot(vector()));
 		}
 		public double crossMag(Point otherVec) {
-			double x1 = this.vector().x;
-			double y1 = this.vector().y;
-			double x2 = otherVec.x;
-			double y2 = otherVec.y;
-			return x1*y2 - y1*x2; // Magnitude of the cross product
+			return this.vector().cross(otherVec);
 		}
 		public double crossMag(Segment other) {
 			Point vec = other.vector();
@@ -55,18 +51,27 @@ public class DetectLED
 		public Chain(Segment s1) {steps.add(s1);}
 
 		double score() {
-			double score = 0;
 			Mat points = new Mat(steps.size()+1,2,CvType.CV_32FC1);
 			Mat line = new Mat(4,1,CvType.CV_32FC1);
+			Point2 base = steps.get(0).vector();
+
 			points.put(0, 0, lights.get(steps.get(0).A).x);
 			points.put(0, 1, lights.get(steps.get(0).A).y);
 			for(int i = 0; i < steps.size(); i++) {
 				points.put(i+1, 0, lights.get(steps.get(i).B).x);
 				points.put(i+1, 1, lights.get(steps.get(i).B).y);
 			}
+
 			Imgproc.fitLine(points, line, Imgproc.CV_DIST_L2, 0, 0.01, 0.01);
-			System.out.println("FitLine:"+ line.get(0, 0)[0] +","+ line.get(1, 0)[0] +" - "+ line.get(2, 0)[0] +","+ line.get(3, 0)[0]); 
-			return score;
+			Point2 lineNormale = new Point2(line.get(0, 0)[0], line.get(1, 0)[0]);
+			Point2 linePoint = new Point2(line.get(2, 0)[0], line.get(3, 0)[0]);
+
+			double score = Math.abs(lights.get(steps.get(0).A).distanceToLine(linePoint, lineNormale));
+			for(int i = 0; i < steps.size(); i++) {
+				score += Math.abs(lights.get(steps.get(i).B).distanceToLine(linePoint, lineNormale));
+				score += Math.abs(steps.get(i).vector().dot(base) - 1);
+			}
+			return score / (base.norm() * steps.size()) + 10*(9 - steps.size());
 		}
 
 		double scoreGravitational(Point p) {
@@ -87,16 +92,16 @@ public class DetectLED
 			return 0.01 / (gravector.x * gravector.x + gravector.y * gravector.y);
 		}
 
-		double scoreByDistance(Point p) {
+		double scoreByDistance(Point2 p) {
 			double score = 0;
-			Point o = lights.get(steps.get(steps.size()-1).B);
-			Point v = new Point(p.x-o.x, p.y-o.y); // This is a vector from the end to the point p
-			Point s = steps.get(0).vector();
-			score += steps.get(0).length() / segLength(v, s);
+			Point2 o = lights.get(steps.get(steps.size()-1).B);
+			Point2 v = p.minus(o); // This is a vector from the end to the point p
+			Point2 s = steps.get(0).vector();
+			score += steps.get(0).length() / s.minus(v).norm();
 			s.x /= 2.0; s.y /= 2.0;
-			score += steps.get(0).length() / segLength(v, s);
+			score += steps.get(0).length() / s.minus(v).norm();
 			s.x *= 4.0; s.y *= 4.0;
-			score += steps.get(0).length() / segLength(v, s);
+			score += steps.get(0).length() / s.minus(v).norm();
 			return 255.0 / score;
 		}
 
@@ -151,7 +156,7 @@ public class DetectLED
 	private double minArea;
 	private double maxArea;
 	private double maxSeg;
-	public List<Point> lights = new ArrayList<Point>();
+	public List<Point2> lights = new ArrayList<Point2>();
 	public List<Chain> chains = new ArrayList<Chain>();
 
 	public DetectLED(double brightnessThresh, double blobMinArea, double blobMaxArea) {
@@ -187,7 +192,7 @@ public class DetectLED
 			//System.out.println("Area: "+area);
 			if(minArea < area && area  < maxArea) {
 				Moments m = Imgproc.moments(cont);
-				lights.add(new Point(m.m10/m.m00, m.m01/m.m00));
+				lights.add(new Point2(m.m10/m.m00, m.m01/m.m00));
 			}
 		}
 		return this;
@@ -214,7 +219,7 @@ public class DetectLED
 			double avgScore = 0;
 			// Build the chain with up to 8 steps (9 total, or 10 points)
 			for (int i = 0; i < 8; i++) {
-				found = c.bestMatch(30.0);
+				found = c.bestMatch(300.0);
 				avgScore = c.totalScore/c.steps.size();
 				if(!found) break;
 			}

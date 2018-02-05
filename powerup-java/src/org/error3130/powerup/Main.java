@@ -58,7 +58,7 @@ public class Main {
 					for(Segment seg: sp.steps) {
 						Imgproc.line(temp, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
 					}
-					System.out.println(sp.steps +" "+ sp.totalScore);
+					System.out.println(sp.steps +" "+ sp.score());
 					HighGui.imshow("test", temp);
 					int key = HighGui.waitKey(0);
 					color+=29;

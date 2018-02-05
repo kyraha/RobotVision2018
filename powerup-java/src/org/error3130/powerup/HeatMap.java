@@ -21,11 +21,11 @@ public class HeatMap {
 		System.out.println("Library loaded: "+ Core.NATIVE_LIBRARY_NAME);
 		Mat image = Mat.zeros(480, 640, CvType.CV_8UC3);
 		DetectLED detector = new DetectLED();
-		detector.lights.add(new Point(100,200));
-		detector.lights.add(new Point(150,200));
-		detector.lights.add(new Point(200,200));
-		detector.lights.add(new Point(250,205));
-		detector.lights.add(new Point(300,200));
+		detector.lights.add(new Point2(100,200));
+		detector.lights.add(new Point2(150,200));
+		detector.lights.add(new Point2(200,200));
+		detector.lights.add(new Point2(250,205));
+		detector.lights.add(new Point2(300,200));
 		detector.chains.add(detector.new Chain(detector.new Segment(0, 1)));
 		detector.chains.get(0).steps.add(detector.new Segment(0, 1));
 		detector.chains.get(0).steps.add(detector.new Segment(1, 2));
@@ -33,7 +33,7 @@ public class HeatMap {
 		detector.chains.get(0).steps.add(detector.new Segment(3, 4));
 		for(int x = 0; x < 640; x++) {
 			for(int y = 0; y < 480; y++) {
-				Point p = new Point(x,y);
+				Point2 p = new Point2(x,y);
 				double score = detector.chains.get(0).scoreByDistance(p);
 				Imgproc.circle(image, p, 0, new Scalar(score,0,255-score));
 			}
