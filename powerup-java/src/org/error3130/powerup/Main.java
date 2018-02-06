@@ -3,7 +3,9 @@ package org.error3130.powerup;
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -31,12 +33,15 @@ public class Main {
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
 
+			Rect roiRect = new Rect(new Point(0, image.height()/5), new Size(image.width(), image.height()/3));
+
 			DetectLED detector = new DetectLED()
 					.withThresh(120)
 					.withMinArea(imageSize/400)
 					.withMaxArea(imageSize/16)
-					.withMaxSegment(imageSize/10)
-					.findLEDs(image)
+					.withMaxSegment(imageSize/10);
+
+			detector.findLEDs(image, roiRect)
 					.findSegments()
 					.findChains();
 
@@ -66,6 +71,22 @@ public class Main {
 					if(key == 27) break;
 				}
 			}
+
+			roiRect = new Rect(new Point(0, 2*image.height()/3), new Size(image.width(), image.height()/3));
+			detector.findLEDs(image, roiRect)
+					.findSegments()
+					.findChains();
+			System.out.println("Lights detected: "+ detector.lights.size());
+			for(int i = 0; i < detector.lights.size(); i++) {
+				Point center = detector.lights.get(i);
+				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
+				Imgproc.putText(image, " "+i, center, 1, 1, new Scalar(0,0,255));
+			}
+			for(Segment seg: detector.chains.get(0).steps) {
+				Imgproc.line(image, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
+			}
+			HighGui.imshow("test", image);
+			int key = HighGui.waitKey(0);
 
 			HighGui.destroyAllWindows();
 		}

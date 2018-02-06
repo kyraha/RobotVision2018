@@ -9,6 +9,7 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.Point;
+import org.opencv.core.Rect;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.imgproc.Moments;
 
@@ -136,7 +137,6 @@ public class DetectLED
 			myPoints.add(myEnd);
 			for(int p = 0; p < lights.size(); p++) {
 				if(myPoints.contains(p)) continue;
-				Segment s = new Segment(myEnd,p);
 				double score = scoreByDistance(lights.get(p));
 				if(score < bestScore) {
 					bestScore = score;
@@ -172,12 +172,16 @@ public class DetectLED
 	public DetectLED withMaxArea(double x) { this.maxArea = x; return this;	}
 	public DetectLED withMaxSegment(double x) { this.maxSeg = x; return this; }
 
-	public DetectLED findLEDs(Mat image) {
+	public DetectLED findLEDs(Mat image, Rect roiRect) {
+		// Reset all previously found LEDs if any
+		lights = new ArrayList<Point2>();
 
 		Mat grey = new Mat();
 		Mat bw = new Mat();
+
+		Mat roi = new Mat(image, roiRect);
 		
-		Imgproc.cvtColor(image, grey, Imgproc.COLOR_BGR2GRAY);
+		Imgproc.cvtColor(roi, grey, Imgproc.COLOR_BGR2GRAY);
 		Imgproc.threshold(grey, bw, thresh , 255, 0);
 
 		//HighGui.imshow("test", bw);
@@ -185,7 +189,7 @@ public class DetectLED
 
 		// Pay attention to EXTERNAL contours only, ignore nested contours.
 		List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
-		Imgproc.findContours(bw, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+		Imgproc.findContours(bw, contours, new Mat(), Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE, roiRect.tl());
 
 		for (MatOfPoint cont: contours) {
 			double area = Imgproc.contourArea(cont);
@@ -199,6 +203,8 @@ public class DetectLED
 	}
 	
 	public DetectLED findSegments() {
+		// Reset all previously found chains of segments if any
+		chains = new ArrayList<Chain>();
 		// Every single line segment is a candidate to build a chain upon it
 		// So let's seed the starting points for all potential chains
 		for (int i=0; i < lights.size(); i++) {
