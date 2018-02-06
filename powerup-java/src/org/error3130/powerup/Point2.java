@@ -20,6 +20,10 @@ public class Point2 extends Point {
 		return this.plus(other.negative());
 	}
 
+	public Point2 scale(double m) {
+		return new Point2(x*m, y*m);
+	}
+
 	public double distance(Point other) {
 		double dx = x - other.x;
 		double dy = y - other.y;

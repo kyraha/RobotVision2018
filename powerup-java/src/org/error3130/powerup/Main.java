@@ -10,7 +10,6 @@ import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.error3130.powerup.DetectLED;
-import org.error3130.powerup.DetectLED.Segment;
 import org.error3130.powerup.DetectLED.Chain;
 
 public class Main {
@@ -39,13 +38,14 @@ public class Main {
 					.withThresh(120)
 					.withMinArea(imageSize/400)
 					.withMaxArea(imageSize/16)
-					.withMaxSegment(imageSize/10);
+					.withMaxSegment(imageSize/5);
 
 			detector.findLEDs(image, roiRect)
 					.findSegments()
 					.findChains();
 
 			System.out.println("Lights detected: "+ detector.lights.size());
+			System.out.println("Chains detected: "+ detector.chains.size());
 			for(int i = 0; i < detector.lights.size(); i++) {
 				Point center = detector.lights.get(i);
 				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
@@ -54,39 +54,55 @@ public class Main {
 			HighGui.imshow("test", image);
 			HighGui.waitKey();
 
-			System.out.println("Chains detected: "+ detector.chains.size());
 
-			int color = 0;
-			for(Chain sp: detector.chains) {
-				Mat temp = image.clone();
-				if(sp.steps.size() > 1) {
-					for(Segment seg: sp.steps) {
-						Imgproc.line(temp, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
+			if(detector.chains.size() > 0) {
+				Chain sp = detector.chains.get(0);
+				if(sp.nodes.size() > 1) {
+					int i = 0;
+					Point2 pointA = new Point2(0,0);
+					for(Point2 pointB: sp.nodes) {
+						if(i > 0) {
+							Imgproc.line(image, pointA, pointB, new Scalar(0, 255, 255));
+						}
+						pointA = pointB;
+						i++;
 					}
-					System.out.println(sp.steps +" "+ sp.score());
-					HighGui.imshow("test", temp);
-					int key = HighGui.waitKey(0);
-					color+=29;
-					if(color > 200) color -= 200;
-					if(key == 27) break;
+					System.out.println(sp.nodeIndex +" "+ sp.score());
 				}
 			}
+			HighGui.imshow("test", image);
+			HighGui.waitKey(0);
 
 			roiRect = new Rect(new Point(0, 2*image.height()/3), new Size(image.width(), image.height()/3));
+
 			detector.findLEDs(image, roiRect)
 					.findSegments()
 					.findChains();
+
 			System.out.println("Lights detected: "+ detector.lights.size());
+			System.out.println("Chains detected: "+ detector.chains.size());
 			for(int i = 0; i < detector.lights.size(); i++) {
 				Point center = detector.lights.get(i);
 				Imgproc.circle(image, center , (int)(imageSize/70), new Scalar(255,0,255));
 				Imgproc.putText(image, " "+i, center, 1, 1, new Scalar(0,0,255));
 			}
-			for(Segment seg: detector.chains.get(0).steps) {
-				Imgproc.line(image, seg.pointA(), seg.pointB(), new Scalar(color, 255, 255));
+			if(detector.chains.size() > 0) {
+				Chain sp = detector.chains.get(0);
+				if(sp.nodes.size() > 1) {
+					int i = 0;
+					Point2 pointA = new Point2(0,0);
+					for(Point2 pointB: sp.nodes) {
+						if(i > 0) {
+							Imgproc.line(image, pointA, pointB, new Scalar(0, 255, 255));
+						}
+						pointA = pointB;
+						i++;
+					}
+					System.out.println(sp.nodeIndex +" "+ sp.score());
+				}
 			}
 			HighGui.imshow("test", image);
-			int key = HighGui.waitKey(0);
+			HighGui.waitKey(0);
 
 			HighGui.destroyAllWindows();
 		}

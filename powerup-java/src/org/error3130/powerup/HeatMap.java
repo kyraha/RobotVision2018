@@ -20,17 +20,16 @@ public class HeatMap {
 		System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
 		System.out.println("Library loaded: "+ Core.NATIVE_LIBRARY_NAME);
 		Mat image = Mat.zeros(480, 640, CvType.CV_8UC3);
-		DetectLED detector = new DetectLED();
+		DetectLED detector = new DetectLED().withMaxSegment(100);
 		detector.lights.add(new Point2(100,200));
 		detector.lights.add(new Point2(150,200));
 		detector.lights.add(new Point2(200,200));
 		detector.lights.add(new Point2(250,205));
 		detector.lights.add(new Point2(300,200));
-		detector.chains.add(detector.new Chain(detector.new Segment(0, 1)));
-		detector.chains.get(0).steps.add(detector.new Segment(0, 1));
-		detector.chains.get(0).steps.add(detector.new Segment(1, 2));
-		detector.chains.get(0).steps.add(detector.new Segment(2, 3));
-		detector.chains.get(0).steps.add(detector.new Segment(3, 4));
+		detector.chains.add(detector.new Chain(0, 1));
+		detector.chains.get(0).addNode(2);
+		detector.chains.get(0).addNode(3);
+		detector.chains.get(0).addNode(4);
 		for(int x = 0; x < 640; x++) {
 			for(int y = 0; y < 480; y++) {
 				Point2 p = new Point2(x,y);
