@@ -35,9 +35,9 @@ public class Main {
 			Rect roiRect = new Rect(new Point(0, image.height()/5), new Size(image.width(), image.height()/3));
 
 			DetectLED detector = new DetectLED()
-					.withThresh(120)
+					.withThresh(100)
 					.withMinArea(imageSize/400)
-					.withMaxArea(imageSize/16)
+					.withMaxArea(imageSize/10)
 					.withMaxSegment(imageSize/5);
 
 			detector.findLEDs(image, roiRect)
@@ -67,7 +67,7 @@ public class Main {
 						pointA = pointB;
 						i++;
 					}
-					System.out.println(sp.nodeIndex +" "+ sp.score());
+					System.out.println(sp.nodeIndex +" "+ sp.score);
 				}
 			}
 			HighGui.imshow("test", image);
@@ -98,7 +98,7 @@ public class Main {
 						pointA = pointB;
 						i++;
 					}
-					System.out.println(sp.nodeIndex +" "+ sp.score());
+					System.out.println(sp.nodeIndex +" "+ sp.score);
 				}
 			}
 			HighGui.imshow("test", image);

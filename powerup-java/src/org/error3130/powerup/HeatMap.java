@@ -20,7 +20,7 @@ public class HeatMap {
 		System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
 		System.out.println("Library loaded: "+ Core.NATIVE_LIBRARY_NAME);
 		Mat image = Mat.zeros(480, 640, CvType.CV_8UC3);
-		DetectLED detector = new DetectLED().withMaxSegment(100);
+		DetectLED detector = new DetectLED().withMaxSegment(200);
 		detector.lights.add(new Point2(100,200));
 		detector.lights.add(new Point2(150,200));
 		detector.lights.add(new Point2(200,200));
