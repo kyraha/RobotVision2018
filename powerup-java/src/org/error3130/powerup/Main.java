@@ -35,7 +35,7 @@ public class Main {
 			Rect roiRect = new Rect(new Point(0, image.height()/5), new Size(image.width(), image.height()/3));
 
 			DetectLED detector = new DetectLED()
-					.withThresh(100)
+					.withThresh(60)
 					.withMinArea(imageSize/400)
 					.withMaxArea(imageSize/10)
 					.withMaxSegment(imageSize/5);

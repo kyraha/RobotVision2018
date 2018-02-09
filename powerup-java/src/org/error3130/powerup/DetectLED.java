@@ -1,6 +1,7 @@
 package org.error3130.powerup;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -18,13 +19,15 @@ public class DetectLED
 		public List<Point2> nodes;
 		public List<Integer> nodeIndex;
 		public double score;
+		int nodeLimit;
 
-		public Chain(int i, int j) {
+		public Chain(int i, int j, int n) {
 			nodes = new ArrayList<Point2>();
 			nodeIndex = new ArrayList<Integer>();
 			addNode(i);
 			addNode(j);
 			score = 0;
+			nodeLimit = n;
 		}
 
 		public void addNode(int lightNum) {
@@ -43,12 +46,13 @@ public class DetectLED
 			}
 		}
 
-		double calcScore() {
+		void calcScore() {
 			//MatOfPoint ppp = new MatOfPoint(a);
 			Mat points = new Mat(nodes.size(),2,CvType.CV_32FC1);
 			Mat line = new Mat(4,1,CvType.CV_32FC1);
 
 			if(nodes.size() > 2) {
+				// We know for sure here that the size() is at least 3
 				for(int i = 0; i < nodes.size(); i++) {
 					points.put(i, 0, nodes.get(i).x);
 					points.put(i, 1, nodes.get(i).y);
@@ -58,7 +62,9 @@ public class DetectLED
 				Point2 lineNormale = new Point2(line.get(0, 0)[0], line.get(1, 0)[0]);
 				Point2 linePoint = new Point2(line.get(2, 0)[0], line.get(3, 0)[0]);
 	
-				double score = 0;
+				score = 0;
+				double totalLength = 0;
+				double[] lengths = new double[nodes.size() - 1];
 				for(int i = 0; i < nodes.size(); i++) {
 					// First score is the distance from each point to the fitted line
 					// We normalize the distances by the base size so the size doesn't matter
@@ -68,16 +74,26 @@ public class DetectLED
 						// That is cosine -> 1.0, where cosine = a dot b / |a|*|b|
 						Point2 step = nodes.get(i).minus(nodes.get(i-1));
 						double dotProduct = step.dot(base());
-						score += 2 * Math.abs(dotProduct/(base().norm()*step.norm()) - 1);
+						score += Math.abs(dotProduct/(base().norm()*step.norm()) - 1);
+						totalLength += step.norm();
+						lengths[i-1] = step.norm();
 					}
 				}
 				// Normalize by the number of nodes so the shorter sequences don't have advantage
 				score /= nodes.size();
 				// Add scores (penalties) for missing nodes
-				score += Math.abs((double)maxNodes - nodes.size()) / maxNodes;
-				return score;
+				// If we divide the total length by the expected number of steps
+				// the result should be close to the length of the majority of the visible steps 
+				Arrays.sort(lengths);
+				double median = lengths.length % 2 == 0
+						? (lengths[nodes.size()/2] + lengths[nodes.size()/2-1]) / 2
+						:  lengths[nodes.size()/2];
+				score += Math.abs(median - totalLength/(maxNodes-1)) / median;
 			}
-			else return Double.NaN;
+			else {
+				// Two or less nodes is not a chain. So give it the worst score possible 
+				score = Double.MAX_VALUE;
+			}
 		}
 
 		double scoreByDistance(Point2 p) {
@@ -96,6 +112,9 @@ public class DetectLED
 		}
 
 		public boolean findBestMatch() {
+			// Don't do anything if already full
+			if(nodes.size() >= nodeLimit) return false;
+
 			double bestScore = 0.0;
 			int bestLight = -1;
 			for(int p = 0; p < lights.size(); p++) {
@@ -172,7 +191,11 @@ public class DetectLED
 		for (int i=0; i < lights.size(); i++) {
 			for (int j=0; j < lights.size(); j++) {
 				if(i != j && lights.get(i).minus(lights.get(j)).norm() < maxSeg) {
-					chains.add(new Chain(i, j));
+					// Also seed chains for different number of nodes
+					// maxNodes/2 is an arbitrary pick but should be good enough
+					for(int n = maxNodes; n > maxNodes/2; n--) {
+						chains.add(new Chain(i, j, n));
+					}
 				}
 			}
 		}
@@ -181,13 +204,9 @@ public class DetectLED
 
 	public DetectLED findChains() {
 		for (Chain c: chains) {
-			boolean found;
-			// Build each chain with up to 8 steps (9 steps total, or 10 points)
-			for (int i = 0; i < 8; i++) {
-				found = c.findBestMatch();
-				if(!found) break;
-			}
-			c.score = c.calcScore();
+			// Build each chain while we can (the chain will stop building up when full)
+			do {} while(c.findBestMatch());
+			c.calcScore();
 		}
 		Collections.sort(chains, new Comparator<Chain>() {
 			public int compare(Chain a, Chain b) {
@@ -196,6 +215,7 @@ public class DetectLED
 				return 0;
 			}
 		});
+		// After sorting the best chain (with the least score) will be on the top of the array
 		
 		return this;
 	}

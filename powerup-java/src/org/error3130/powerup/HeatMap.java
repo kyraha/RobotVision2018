@@ -26,7 +26,7 @@ public class HeatMap {
 		detector.lights.add(new Point2(200,200));
 		detector.lights.add(new Point2(250,205));
 		detector.lights.add(new Point2(300,200));
-		detector.chains.add(detector.new Chain(0, 1));
+		detector.chains.add(detector.new Chain(0, 1, 5));
 		detector.chains.get(0).addNode(2);
 		detector.chains.get(0).addNode(3);
 		detector.chains.get(0).addNode(4);
