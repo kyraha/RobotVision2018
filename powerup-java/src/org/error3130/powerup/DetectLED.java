@@ -222,12 +222,15 @@ public class DetectLED
 	}
 
 	MatOfPoint2f getCorners() {
-		List<Point2> tmpNodes = chains.get(0).nodes;
-		tmpNodes.sort(new Comparator<Point2>() {
-			public int compare(Point2 a, Point2 b) { return Double.compare(a.x, b.x); }
-		});
-		Point2 left = tmpNodes.get(0);
-		Point2 right = tmpNodes.get(tmpNodes.size()-1);
-		return new MatOfPoint2f(left, right);
+		if(chains.size() > 0) {
+			List<Point2> tmpNodes = chains.get(0).nodes;
+			tmpNodes.sort(new Comparator<Point2>() {
+				public int compare(Point2 a, Point2 b) { return Double.compare(a.x, b.x); }
+			});
+			Point2 left = tmpNodes.get(0);
+			Point2 right = tmpNodes.get(tmpNodes.size()-1);
+			return new MatOfPoint2f(left, right);
+		}
+		else return null;
 	}
 }
