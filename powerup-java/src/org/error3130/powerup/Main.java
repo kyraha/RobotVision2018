@@ -16,9 +16,20 @@ import org.opencv.highgui.HighGui;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.videoio.VideoCapture;
+import org.opencv.videoio.Videoio;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.error3130.powerup.DetectLED;
 import org.error3130.powerup.DetectLED.Chain;
@@ -29,13 +40,15 @@ public class Main {
 		System.out.println("Library loaded: "+ Core.NATIVE_LIBRARY_NAME);
 	}
 
-	static double camera_matrix[] = { 1.1312010798594224e+03, 0., 6.2056706058995383e+02, 0.,
-	           1.1312010798594224e+03, 3.3312414963664799e+02, 0., 0., 1. };
-	static double camera_dist[] = { 1.2499165734503319e-01, -1.1009971037701471e+00,
-	                                          5.3431557229252234e-04, -3.2697740842547215e-04,
-	                                          2.0261366290992946e+00 };
+	// Camera intrinsics, obtained by "camera calibration" (see [google] tutorial_interactive_calibration.html)
+	// These numbers are for the MS Lifecam HD3000 #1 at 1280x720 mode
+	static private double[] cameraDoubles = {1.1159304477424785e+03, 0., 6.2199798030884358e+02, 0.,
+		    1.1159304477424785e+03, 3.8725727347891808e+02, 0., 0., 1.};
+	static private double[] distortionDoubles = {1.2109074822929057e-01, -1.0293273066620283e+00, 0., 0.,
+		    1.8601846077358326e+00};
+
 	static MatOfPoint3f objectPoints;
-	static Mat cameraMatrix;
+	static Mat cameraMatrix = new Mat(3, 3, CvType.CV_32F);
 	static MatOfDouble distCoeffs;
 
 
@@ -44,13 +57,16 @@ public class Main {
 
 		MatOfPoint2f imagePoints = new MatOfPoint2f();
 
-		Rect roiRect = new Rect(new Point(0, image.height()/5), new Size(image.width(), image.height()/3));
+		Rect roiRect = new Rect(
+				new Point(0.2*image.width(), 0.14*image.height()),
+				new Size(0.6*image.width(), 0.24*image.height()));
+		Imgproc.rectangle(image, roiRect.tl(), roiRect.br(), new Scalar(64,64,64));
 
 		DetectLED detector = new DetectLED()
-				.withThresh(60)
+				.withThresh(128)
 				.withMinArea(imageSize/400)
 				.withMaxArea(imageSize/10)
-				.withMaxSegment(imageSize/5);
+				.withMaxSegment(image.width()/10);
 
 		detector.findLEDs(image, roiRect)
 				.findSegments()
@@ -82,7 +98,10 @@ public class Main {
 			}
 		}
 
-		roiRect = new Rect(new Point(0, 2*image.height()/3), new Size(image.width(), image.height()/3));
+		roiRect = new Rect(
+				new Point(0.05*image.width(), 0.6*image.height()),
+				new Size(0.9*image.width(), 0.22*image.height()));
+		Imgproc.rectangle(image, roiRect.tl(), roiRect.br(), new Scalar(64,64,64));
 
 		detector.findLEDs(image, roiRect)
 				.findSegments()
@@ -121,33 +140,93 @@ public class Main {
 		Mat rvec = new Mat();
 		Mat tvec = new Mat();
 		Calib3d.solvePnP(objectPoints, imagePoints, cameraMatrix, distCoeffs, rvec, tvec);
-		String text = String.format("Tvec %6.1g %6.1g %6.1g",
+		String text = String.format("Tvec %6.1f %6.1f %6.1f",
 			tvec.get(0,0)[0],
 			tvec.get(1,0)[0],
 			tvec.get(2,0)[0]);
 		Imgproc.putText(image, text, new Point(10,10), 1, 1, new Scalar(0,255,0));
-		text = String.format("Rvec %6.1g %6.1g %6.1g",
+		text = String.format("Rvec %8.3f %8.3f %8.3f",
 				rvec.get(0,0)[0],
 				rvec.get(1,0)[0],
 				rvec.get(2,0)[0]);
 		Imgproc.putText(image, text, new Point(10,40), 1, 1, new Scalar(0,255,0));
 	}
+	
+	private static void loadCameraIntrinsics()
+	{
+		File file = new File("/home/mkyraha/tmp/calibrate/cameraParameters.xml");
+		DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+		DocumentBuilder db;
+		
+		try {
+			db = dbf.newDocumentBuilder();
+			Document document = db.parse(file);
+			NodeList dataNodes = document.getElementsByTagName("data");
+			for(int nod=0; nod < dataNodes.getLength(); nod++) {
+				Node data = dataNodes.item(nod);
+				String[] numbers = data.getTextContent().trim().split("[ \n]+");
+				switch(data.getParentNode().getNodeName()) {
+				case "cameraMatrix":
+					System.out.println("CamMat: ");
+					for(int i=0; i<3; i++)
+						for(int j=0; j<3; j++) {
+							double num = Double.parseDouble(numbers[3*i+j]);
+							cameraMatrix.put(i, j, num);
+							System.out.println("  : "+num);
+						}
+					break;
+				case "dist_coeffs":
+					System.out.println("DistCo: " + data.getTextContent());
+					List<Double> doubles = new ArrayList<Double>();
+					for(String strNum: numbers) {
+						doubles.add(Double.parseDouble(strNum));
+						System.out.println("DistCo: " + strNum);
+					}
+					distCoeffs = new MatOfDouble();
+					distCoeffs.fromList(doubles);
+					break;
+				}
+			}
+		} catch (ParserConfigurationException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (SAXException | IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	}
 
 	public static void main( String[] args )
 	{
-		objectPoints = new MatOfPoint3f();
-		List<Point3> objectReal = new ArrayList<Point3>();
-		objectReal.add(new Point3(55.09, -57, 300));
-		objectReal.add(new Point3(89.44, -57, 300));
-		objectReal.add(new Point3(36.91, -8, 146));
-		objectReal.add(new Point3(71.02, -10, 146));
-		objectPoints.fromList(objectReal);
+		loadCameraIntrinsics();
 
-		distCoeffs = new MatOfDouble(camera_dist);
+		objectPoints = new MatOfPoint3f();
+		List<Point3> objectLeft = new ArrayList<Point3>();
+		List<Point3> objectRight = new ArrayList<Point3>();
+		List<Point3> objectPractice = new ArrayList<Point3>();
+		// Practice field
+		// 144 + 159
+		objectPractice.add(new Point3(-65.00, -57.5, 303));
+		objectPractice.add(new Point3(-35.50, -58.5, 303));
+		objectPractice.add(new Point3(-50.00, -6.5, 146));
+		objectPractice.add(new Point3(-21.00, -6.5, 146));
+		// Left side
+		objectLeft.add(new Point3(-89.44, -57, 300));
+		objectLeft.add(new Point3(-55.09, -57, 300));
+		objectLeft.add(new Point3(-71.02, -10, 146));
+		objectLeft.add(new Point3(-36.91, -8, 146));
+		// Right side
+		objectRight.add(new Point3(55.09, -57, 300));
+		objectRight.add(new Point3(89.44, -57, 300));
+		objectRight.add(new Point3(36.91, -8, 146));
+		objectRight.add(new Point3(71.02, -10, 146));
+		objectPoints.fromList(objectPractice);
+
+		distCoeffs = new MatOfDouble(distortionDoubles);
 		cameraMatrix = new Mat(3, 3, CvType.CV_32F);
 		for(int i=0; i<3; i++)
 			for(int j=0; j<3; j++) {
-				cameraMatrix.put(i, j, camera_matrix[3*i+j]);
+				cameraMatrix.put(i, j, cameraDoubles[3*i+j]);
 			}
 		
 		if(args.length > 0 ) {
@@ -173,6 +252,13 @@ public class Main {
 			cap.open(0);
 
 			if(cap.isOpened()) {
+				// HD-3000 min exposure is 5, Tested: 5, 10, 20, 39, 78, 156, 312, 625...
+				cap.set(Videoio.CAP_PROP_FRAME_WIDTH, 1280);
+				cap.set(Videoio.CAP_PROP_FRAME_HEIGHT, 720);
+				cap.set(Videoio.CAP_PROP_FPS, 4);
+				cap.set(Videoio.CAP_PROP_AUTO_EXPOSURE, 1);
+				cap.set(Videoio.CAP_PROP_EXPOSURE, 156);
+				System.out.println("Exposure: "+ cap.get(Videoio.CAP_PROP_EXPOSURE));
 				do {
 					cap.read(frame);
 					processFrame(frame);
